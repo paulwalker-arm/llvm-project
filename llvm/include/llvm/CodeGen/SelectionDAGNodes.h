@@ -204,6 +204,10 @@ public:
     return getValueType().getScalarType().getFixedSizeInBits();
   }
 
+  EVT getScalarValueType() const {
+    return getValueType().getScalarType();
+  }
+
   // Forwarding methods - These forward to the corresponding methods in SDNode.
   inline unsigned getOpcode() const;
   inline unsigned getNumOperands() const;
