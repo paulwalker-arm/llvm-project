@@ -1118,8 +1118,18 @@ private:
       return PI.setAborted(&LI);
 
     TypeSize Size = DL.getTypeStoreSize(LI.getType());
-    if (Size.isScalable())
-      return PI.setAborted(&LI);
+    if (Size.isScalable()) {
+      Attribute Attr = LI.getFunction()->getFnAttribute(Attribute::VScaleRange);
+      // Without vscale_range, we only know that vscale is non-zero.
+      if (!Attr.isValid())
+        return PI.setAborted(&LI);
+
+      std::optional<unsigned> AttrMax = Attr.getVScaleRangeMax();
+      if (!AttrMax && *AttrMax == 0 && *AttrMax != Attr.getVScaleRangeMin())
+        return PI.setAborted(&LI);
+
+      Size = TypeSize::getFixed(Size.getKnownMinValue() * *AttrMax);
+    }
 
     return handleLoadOrStore(LI.getType(), LI, Offset, Size.getFixedValue(),
                              LI.isVolatile());
@@ -1133,8 +1143,18 @@ private:
       return PI.setAborted(&SI);
 
     TypeSize StoreSize = DL.getTypeStoreSize(ValOp->getType());
-    if (StoreSize.isScalable())
-      return PI.setAborted(&SI);
+    if (StoreSize.isScalable()) {
+      Attribute Attr = SI.getFunction()->getFnAttribute(Attribute::VScaleRange);
+      // Without vscale_range, we only know that vscale is non-zero.
+      if (!Attr.isValid())
+        return PI.setAborted(&SI);
+
+      std::optional<unsigned> AttrMax = Attr.getVScaleRangeMax();
+      if (!AttrMax && *AttrMax == 0 && *AttrMax != Attr.getVScaleRangeMin())
+        return PI.setAborted(&SI);
+
+      StoreSize = TypeSize::getFixed(StoreSize.getKnownMinValue() * *AttrMax);
+    }
 
     uint64_t Size = StoreSize.getFixedValue();
 
@@ -1919,6 +1939,28 @@ static Align getAdjustedAlignment(Instruction *I, uint64_t Offset) {
   return commonAlignment(getLoadStoreAlignment(I), Offset);
 }
 
+// NOTE: This belongs in VectorType but that will cause a large rebuild so I am
+// waiting until the function have crystalised.
+static VectorType *getWithSizeAndScalar(VectorType *SizeTy, Type *EltTy) {
+  if (SizeTy->getScalarType() == EltTy->getScalarType())
+    return SizeTy;
+
+  unsigned CurrEltSize = SizeTy->getScalarSizeInBits();
+  unsigned NewEltSize = EltTy->getScalarSizeInBits();
+
+  ElementCount EC = SizeTy->getElementCount();
+  if (CurrEltSize > NewEltSize)
+    EC = EC.multiplyCoefficientBy(CurrEltSize / NewEltSize);
+  else if (CurrEltSize < NewEltSize)
+    EC = EC.divideCoefficientBy(NewEltSize / CurrEltSize);
+
+  if (EC.multiplyCoefficientBy(NewEltSize) !=
+      SizeTy->getElementCount().multiplyCoefficientBy(CurrEltSize))
+    return nullptr;
+
+  return VectorType::get(EltTy->getScalarType(), EC);
+}
+
 /// Test whether we can convert a value from the old to the new type.
 ///
 /// This predicate should be used to guard calls to convertValue in order to
@@ -1939,8 +1981,21 @@ static bool canConvertValue(const DataLayout &DL, Type *OldTy, Type *NewTy) {
     return false;
   }
 
-  if (DL.getTypeSizeInBits(NewTy).getFixedValue() !=
-      DL.getTypeSizeInBits(OldTy).getFixedValue())
+  if (isa<ScalableVectorType>(NewTy) && isa<FixedVectorType>(OldTy) &&
+      /*VectorType::*/ getWithSizeAndScalar(cast<VectorType>(NewTy), OldTy)) {
+    LLVM_DEBUG(dbgs() << "Now we're getting somewhere - load!\n"
+                      << NewTy << " <--- " << OldTy << "\n");
+    return true;
+  }
+
+  if (isa<FixedVectorType>(NewTy) && isa<ScalableVectorType>(OldTy) &&
+      /*VectorType::*/ getWithSizeAndScalar(cast<VectorType>(OldTy), NewTy)) {
+    LLVM_DEBUG(dbgs() << "Now we're getting somewhere - store!\n"
+                      << NewTy << " <--- " << OldTy << "\n");
+    return true;
+  }
+
+  if (DL.getTypeSizeInBits(NewTy) != DL.getTypeSizeInBits(OldTy))
     return false;
   if (!NewTy->isSingleValueType() || !OldTy->isSingleValueType())
     return false;
@@ -2032,6 +2087,20 @@ static Value *convertValue(const DataLayout &DL, IRBuilderTy &IRB, Value *V,
       return IRB.CreateIntToPtr(IRB.CreatePtrToInt(V, DL.getIntPtrType(OldTy)),
                                 NewTy);
     }
+  }
+
+  if (isa<ScalableVectorType>(NewTy) && isa<FixedVectorType>(OldTy)) {
+    auto *Ty =
+        /*VectorType::*/ getWithSizeAndScalar(cast<VectorType>(NewTy), OldTy);
+    V = IRB.CreateInsertVector(Ty, PoisonValue::get(Ty), V, IRB.getInt64(0));
+    return IRB.CreateBitCast(V, NewTy);
+  }
+
+  if (isa<FixedVectorType>(NewTy) && isa<ScalableVectorType>(OldTy)) {
+    auto *Ty =
+        /*VectorType::*/ getWithSizeAndScalar(cast<VectorType>(OldTy), NewTy);
+    V = IRB.CreateBitCast(V, Ty);
+    return IRB.CreateExtractVector(NewTy, V, IRB.getInt64(0));
   }
 
   return IRB.CreateBitCast(V, NewTy);
@@ -2219,8 +2288,9 @@ checkVectorTypesForPromotion(Partition &P, const DataLayout &DL,
   // FIXME: hack. Do we have a named constant for this?
   // SDAG SDNode can't have more than 65535 operands.
   llvm::erase_if(CandidateTys, [](VectorType *VTy) {
-    return cast<FixedVectorType>(VTy)->getNumElements() >
-           std::numeric_limits<unsigned short>::max();
+    return isa<ScalableVectorType>(VTy) ||
+           cast<FixedVectorType>(VTy)->getNumElements() >
+               std::numeric_limits<unsigned short>::max();
   });
 
   for (VectorType *VTy : CandidateTys)
@@ -2247,6 +2317,8 @@ static VectorType *createAndCheckVectorTypesForPromotion(
     // Make a copy of CandidateTys and iterate through it, because we
     // might append to CandidateTys in the loop.
     for (VectorType *const VTy : CandidateTysCopy) {
+      if (VTy->isScalableTy())
+        continue;
       // The elements in the copy should remain invariant throughout the loop
       assert(CandidateTysCopy[0] == OriginalElt && "Different Element");
       unsigned VectorSize = DL.getTypeSizeInBits(VTy).getFixedValue();
@@ -2290,8 +2362,7 @@ static VectorType *isVectorPromotionViable(Partition &P, const DataLayout &DL) {
       // Return if bitcast to vectors is different for total size in bits.
       if (!CandidateTys.empty()) {
         VectorType *V = CandidateTys[0];
-        if (DL.getTypeSizeInBits(VTy).getFixedValue() !=
-            DL.getTypeSizeInBits(V).getFixedValue()) {
+        if (DL.getTypeSizeInBits(VTy) != DL.getTypeSizeInBits(V)) {
           CandidateTys.clear();
           return;
         }
@@ -2385,6 +2456,8 @@ static bool isIntegerWideningViableForSlice(const Slice &S,
     if (LI->isVolatile())
       return false;
     // We can't handle loads that extend past the allocated memory.
+    if (LI->getType()->isScalableTy())
+      return false;
     if (DL.getTypeStoreSize(LI->getType()).getFixedValue() > Size)
       return false;
     // So far, AllocaSliceRewriter does not support widening split slice tails
@@ -2410,6 +2483,8 @@ static bool isIntegerWideningViableForSlice(const Slice &S,
     if (SI->isVolatile())
       return false;
     // We can't handle stores that extend past the allocated memory.
+    if (ValueTy->isScalableTy())
+      return false;
     if (DL.getTypeStoreSize(ValueTy).getFixedValue() > Size)
       return false;
     // So far, AllocaSliceRewriter does not support widening split slice tails
@@ -2884,6 +2959,7 @@ private:
     Type *TargetTy = IsSplit ? Type::getIntNTy(LI.getContext(), SliceSize * 8)
                              : LI.getType();
     const bool IsLoadPastEnd =
+        !TargetTy->isScalableTy() &&
         DL.getTypeStoreSize(TargetTy).getFixedValue() > SliceSize;
     bool IsPtrAdjusted = false;
     Value *V;
@@ -3068,7 +3144,8 @@ private:
       if (AllocaInst *AI = dyn_cast<AllocaInst>(V->stripInBoundsOffsets()))
         Pass.PostPromotionWorklist.insert(AI);
 
-    if (SliceSize < DL.getTypeStoreSize(V->getType()).getFixedValue()) {
+    if (!V->getType()->isScalableTy() &&
+        SliceSize < DL.getTypeStoreSize(V->getType()).getFixedValue()) {
       assert(!SI.isVolatile());
       assert(V->getType()->isIntegerTy() &&
              "Only integer type loads and stores are split");
@@ -4847,11 +4924,14 @@ AllocaInst *SROA::rewritePartition(AllocaInst &AI, AllocaSlices &AS,
   std::pair<Type *, IntegerType *> CommonUseTy =
       findCommonType(P.begin(), P.end(), P.endOffset());
   // Do all uses operate on the same type?
-  if (CommonUseTy.first)
+  if (CommonUseTy.first) {
+    if (CommonUseTy.first->isScalableTy())
+      return nullptr;
     if (DL.getTypeAllocSize(CommonUseTy.first).getFixedValue() >= P.size()) {
       SliceTy = CommonUseTy.first;
       SliceVecTy = dyn_cast<VectorType>(SliceTy);
     }
+  }
   // If not, can we find an appropriate subtype in the original allocated type?
   if (!SliceTy)
     if (Type *TypePartitionTy = getTypePartition(DL, AI.getAllocatedType(),
