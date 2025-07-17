@@ -197,3 +197,222 @@ define i64 @smini64_zero(i64 %a) {
   %c = call i64 @llvm.smin.i64(i64 %a, i64 0)
   ret i64 %c
 }
+
+define i32 @smaxi32_poison(i32 %a) {
+; CHECK-ISEL-LABEL: smaxi32_poison:
+; CHECK-ISEL:       // %bb.0:
+; CHECK-ISEL-NEXT:    cmp w0, w8
+; CHECK-ISEL-NEXT:    csel w0, w0, w8, gt
+; CHECK-ISEL-NEXT:    ret
+;
+; CHECK-CSSC-LABEL: smaxi32_poison:
+; CHECK-CSSC:       // %bb.0:
+; CHECK-CSSC-NEXT:    smax w0, w0, w8
+; CHECK-CSSC-NEXT:    ret
+;
+; CHECK-GLOBAL-LABEL: smaxi32_poison:
+; CHECK-GLOBAL:       // %bb.0:
+; CHECK-GLOBAL-NEXT:    cmp w0, w8
+; CHECK-GLOBAL-NEXT:    csel w0, w0, w8, gt
+; CHECK-GLOBAL-NEXT:    ret
+  %c = tail call i32 @llvm.smax.i32(i32 %a, i32 poison)
+  ret i32 %c
+}
+
+define i32 @smini32_poison(i32 %a) {
+; CHECK-ISEL-LABEL: smini32_poison:
+; CHECK-ISEL:       // %bb.0:
+; CHECK-ISEL-NEXT:    cmp w0, w8
+; CHECK-ISEL-NEXT:    csel w0, w0, w8, lt
+; CHECK-ISEL-NEXT:    ret
+;
+; CHECK-CSSC-LABEL: smini32_poison:
+; CHECK-CSSC:       // %bb.0:
+; CHECK-CSSC-NEXT:    smin w0, w0, w8
+; CHECK-CSSC-NEXT:    ret
+;
+; CHECK-GLOBAL-LABEL: smini32_poison:
+; CHECK-GLOBAL:       // %bb.0:
+; CHECK-GLOBAL-NEXT:    cmp w0, w8
+; CHECK-GLOBAL-NEXT:    csel w0, w0, w8, lt
+; CHECK-GLOBAL-NEXT:    ret
+  %c = tail call i32 @llvm.smin.i32(i32 %a, i32 poison)
+  ret i32 %c
+}
+
+define i32 @umaxi32_poison(i32 %a) {
+; CHECK-ISEL-LABEL: umaxi32_poison:
+; CHECK-ISEL:       // %bb.0:
+; CHECK-ISEL-NEXT:    cmp w0, w8
+; CHECK-ISEL-NEXT:    csel w0, w0, w8, hi
+; CHECK-ISEL-NEXT:    ret
+;
+; CHECK-CSSC-LABEL: umaxi32_poison:
+; CHECK-CSSC:       // %bb.0:
+; CHECK-CSSC-NEXT:    umax w0, w0, w8
+; CHECK-CSSC-NEXT:    ret
+;
+; CHECK-GLOBAL-LABEL: umaxi32_poison:
+; CHECK-GLOBAL:       // %bb.0:
+; CHECK-GLOBAL-NEXT:    cmp w0, w8
+; CHECK-GLOBAL-NEXT:    csel w0, w0, w8, hi
+; CHECK-GLOBAL-NEXT:    ret
+  %c = tail call i32 @llvm.umax.i32(i32 %a, i32 poison)
+  ret i32 %c
+}
+
+define i32 @umini32_poison(i32 %a) {
+; CHECK-ISEL-LABEL: umini32_poison:
+; CHECK-ISEL:       // %bb.0:
+; CHECK-ISEL-NEXT:    cmp w0, w8
+; CHECK-ISEL-NEXT:    csel w0, w0, w8, lo
+; CHECK-ISEL-NEXT:    ret
+;
+; CHECK-CSSC-LABEL: umini32_poison:
+; CHECK-CSSC:       // %bb.0:
+; CHECK-CSSC-NEXT:    umin w0, w0, w8
+; CHECK-CSSC-NEXT:    ret
+;
+; CHECK-GLOBAL-LABEL: umini32_poison:
+; CHECK-GLOBAL:       // %bb.0:
+; CHECK-GLOBAL-NEXT:    cmp w0, w8
+; CHECK-GLOBAL-NEXT:    csel w0, w0, w8, lo
+; CHECK-GLOBAL-NEXT:    ret
+  %c = tail call i32 @llvm.umin.i32(i32 %a, i32 poison)
+  ret i32 %c
+}
+
+define i32 @smaxi32_undef(i32 %a) {
+; CHECK-ISEL-LABEL: smaxi32_undef:
+; CHECK-ISEL:       // %bb.0:
+; CHECK-ISEL-NEXT:    cmp w0, w8
+; CHECK-ISEL-NEXT:    csel w0, w0, w8, gt
+; CHECK-ISEL-NEXT:    ret
+;
+; CHECK-CSSC-LABEL: smaxi32_undef:
+; CHECK-CSSC:       // %bb.0:
+; CHECK-CSSC-NEXT:    smax w0, w0, w8
+; CHECK-CSSC-NEXT:    ret
+;
+; CHECK-GLOBAL-LABEL: smaxi32_undef:
+; CHECK-GLOBAL:       // %bb.0:
+; CHECK-GLOBAL-NEXT:    cmp w0, w8
+; CHECK-GLOBAL-NEXT:    csel w0, w0, w8, gt
+; CHECK-GLOBAL-NEXT:    ret
+  %c = tail call i32 @llvm.smax.i32(i32 %a, i32 undef)
+  ret i32 %c
+}
+
+define i32 @smini32_undef(i32 %a) {
+; CHECK-ISEL-LABEL: smini32_undef:
+; CHECK-ISEL:       // %bb.0:
+; CHECK-ISEL-NEXT:    cmp w0, w8
+; CHECK-ISEL-NEXT:    csel w0, w0, w8, lt
+; CHECK-ISEL-NEXT:    ret
+;
+; CHECK-CSSC-LABEL: smini32_undef:
+; CHECK-CSSC:       // %bb.0:
+; CHECK-CSSC-NEXT:    smin w0, w0, w8
+; CHECK-CSSC-NEXT:    ret
+;
+; CHECK-GLOBAL-LABEL: smini32_undef:
+; CHECK-GLOBAL:       // %bb.0:
+; CHECK-GLOBAL-NEXT:    cmp w0, w8
+; CHECK-GLOBAL-NEXT:    csel w0, w0, w8, lt
+; CHECK-GLOBAL-NEXT:    ret
+  %c = tail call i32 @llvm.smin.i32(i32 %a, i32 undef)
+  ret i32 %c
+}
+
+define i32 @umaxi32_undef(i32 %a) {
+; CHECK-ISEL-LABEL: umaxi32_undef:
+; CHECK-ISEL:       // %bb.0:
+; CHECK-ISEL-NEXT:    cmp w0, w8
+; CHECK-ISEL-NEXT:    csel w0, w0, w8, hi
+; CHECK-ISEL-NEXT:    ret
+;
+; CHECK-CSSC-LABEL: umaxi32_undef:
+; CHECK-CSSC:       // %bb.0:
+; CHECK-CSSC-NEXT:    umax w0, w0, w8
+; CHECK-CSSC-NEXT:    ret
+;
+; CHECK-GLOBAL-LABEL: umaxi32_undef:
+; CHECK-GLOBAL:       // %bb.0:
+; CHECK-GLOBAL-NEXT:    cmp w0, w8
+; CHECK-GLOBAL-NEXT:    csel w0, w0, w8, hi
+; CHECK-GLOBAL-NEXT:    ret
+  %c = tail call i32 @llvm.umax.i32(i32 %a, i32 undef)
+  ret i32 %c
+}
+
+define i32 @umini32_undef(i32 %a) {
+; CHECK-ISEL-LABEL: umini32_undef:
+; CHECK-ISEL:       // %bb.0:
+; CHECK-ISEL-NEXT:    cmp w0, w8
+; CHECK-ISEL-NEXT:    csel w0, w0, w8, lo
+; CHECK-ISEL-NEXT:    ret
+;
+; CHECK-CSSC-LABEL: umini32_undef:
+; CHECK-CSSC:       // %bb.0:
+; CHECK-CSSC-NEXT:    umin w0, w0, w8
+; CHECK-CSSC-NEXT:    ret
+;
+; CHECK-GLOBAL-LABEL: umini32_undef:
+; CHECK-GLOBAL:       // %bb.0:
+; CHECK-GLOBAL-NEXT:    cmp w0, w8
+; CHECK-GLOBAL-NEXT:    csel w0, w0, w8, lo
+; CHECK-GLOBAL-NEXT:    ret
+  %c = tail call i32 @llvm.umin.i32(i32 %a, i32 undef)
+  ret i32 %c
+}
+
+define i32 @smaxi32_undef_undef() {
+; CHECK-ISEL-LABEL: smaxi32_undef_undef:
+; CHECK-ISEL:       // %bb.0:
+; CHECK-ISEL-NEXT:    ret
+;
+; CHECK-GLOBAL-LABEL: smaxi32_undef_undef:
+; CHECK-GLOBAL:       // %bb.0:
+; CHECK-GLOBAL-NEXT:    ret
+  %c = tail call i32 @llvm.smax.i32(i32 undef, i32 undef)
+  ret i32 %c
+}
+
+define i32 @smini32_undef_undef() {
+; CHECK-ISEL-LABEL: smini32_undef_undef:
+; CHECK-ISEL:       // %bb.0:
+; CHECK-ISEL-NEXT:    ret
+;
+; CHECK-GLOBAL-LABEL: smini32_undef_undef:
+; CHECK-GLOBAL:       // %bb.0:
+; CHECK-GLOBAL-NEXT:    ret
+  %c = tail call i32 @llvm.smin.i32(i32 undef, i32 undef)
+  ret i32 %c
+}
+
+define i32 @umaxi32_undef_undef() {
+; CHECK-ISEL-LABEL: umaxi32_undef_undef:
+; CHECK-ISEL:       // %bb.0:
+; CHECK-ISEL-NEXT:    ret
+;
+; CHECK-GLOBAL-LABEL: umaxi32_undef_undef:
+; CHECK-GLOBAL:       // %bb.0:
+; CHECK-GLOBAL-NEXT:    ret
+  %c = tail call i32 @llvm.umax.i32(i32 undef, i32 undef)
+  ret i32 %c
+}
+
+define i32 @umini32_undef_undef() {
+; CHECK-ISEL-LABEL: umini32_undef_undef:
+; CHECK-ISEL:       // %bb.0:
+; CHECK-ISEL-NEXT:    ret
+;
+; CHECK-GLOBAL-LABEL: umini32_undef_undef:
+; CHECK-GLOBAL:       // %bb.0:
+; CHECK-GLOBAL-NEXT:    ret
+  %c = tail call i32 @llvm.umin.i32(i32 undef, i32 undef)
+  ret i32 %c
+}
+
+declare i32 @llvm.umax.i32(i32, i32) readnone
+declare i32 @llvm.umin.i32(i32, i32) readnone
