@@ -201,14 +201,7 @@ define i64 @smini64_zero(i64 %a) {
 define i32 @smaxi32_poison(i32 %a) {
 ; CHECK-ISEL-LABEL: smaxi32_poison:
 ; CHECK-ISEL:       // %bb.0:
-; CHECK-ISEL-NEXT:    cmp w0, w8
-; CHECK-ISEL-NEXT:    csel w0, w0, w8, gt
 ; CHECK-ISEL-NEXT:    ret
-;
-; CHECK-CSSC-LABEL: smaxi32_poison:
-; CHECK-CSSC:       // %bb.0:
-; CHECK-CSSC-NEXT:    smax w0, w0, w8
-; CHECK-CSSC-NEXT:    ret
 ;
 ; CHECK-GLOBAL-LABEL: smaxi32_poison:
 ; CHECK-GLOBAL:       // %bb.0:
@@ -222,14 +215,7 @@ define i32 @smaxi32_poison(i32 %a) {
 define i32 @smini32_poison(i32 %a) {
 ; CHECK-ISEL-LABEL: smini32_poison:
 ; CHECK-ISEL:       // %bb.0:
-; CHECK-ISEL-NEXT:    cmp w0, w8
-; CHECK-ISEL-NEXT:    csel w0, w0, w8, lt
 ; CHECK-ISEL-NEXT:    ret
-;
-; CHECK-CSSC-LABEL: smini32_poison:
-; CHECK-CSSC:       // %bb.0:
-; CHECK-CSSC-NEXT:    smin w0, w0, w8
-; CHECK-CSSC-NEXT:    ret
 ;
 ; CHECK-GLOBAL-LABEL: smini32_poison:
 ; CHECK-GLOBAL:       // %bb.0:
@@ -243,14 +229,7 @@ define i32 @smini32_poison(i32 %a) {
 define i32 @umaxi32_poison(i32 %a) {
 ; CHECK-ISEL-LABEL: umaxi32_poison:
 ; CHECK-ISEL:       // %bb.0:
-; CHECK-ISEL-NEXT:    cmp w0, w8
-; CHECK-ISEL-NEXT:    csel w0, w0, w8, hi
 ; CHECK-ISEL-NEXT:    ret
-;
-; CHECK-CSSC-LABEL: umaxi32_poison:
-; CHECK-CSSC:       // %bb.0:
-; CHECK-CSSC-NEXT:    umax w0, w0, w8
-; CHECK-CSSC-NEXT:    ret
 ;
 ; CHECK-GLOBAL-LABEL: umaxi32_poison:
 ; CHECK-GLOBAL:       // %bb.0:
@@ -264,14 +243,7 @@ define i32 @umaxi32_poison(i32 %a) {
 define i32 @umini32_poison(i32 %a) {
 ; CHECK-ISEL-LABEL: umini32_poison:
 ; CHECK-ISEL:       // %bb.0:
-; CHECK-ISEL-NEXT:    cmp w0, w8
-; CHECK-ISEL-NEXT:    csel w0, w0, w8, lo
 ; CHECK-ISEL-NEXT:    ret
-;
-; CHECK-CSSC-LABEL: umini32_poison:
-; CHECK-CSSC:       // %bb.0:
-; CHECK-CSSC-NEXT:    umin w0, w0, w8
-; CHECK-CSSC-NEXT:    ret
 ;
 ; CHECK-GLOBAL-LABEL: umini32_poison:
 ; CHECK-GLOBAL:       // %bb.0:
@@ -285,14 +257,8 @@ define i32 @umini32_poison(i32 %a) {
 define i32 @smaxi32_undef(i32 %a) {
 ; CHECK-ISEL-LABEL: smaxi32_undef:
 ; CHECK-ISEL:       // %bb.0:
-; CHECK-ISEL-NEXT:    cmp w0, w8
-; CHECK-ISEL-NEXT:    csel w0, w0, w8, gt
+; CHECK-ISEL-NEXT:    mov w0, #2147483647 // =0x7fffffff
 ; CHECK-ISEL-NEXT:    ret
-;
-; CHECK-CSSC-LABEL: smaxi32_undef:
-; CHECK-CSSC:       // %bb.0:
-; CHECK-CSSC-NEXT:    smax w0, w0, w8
-; CHECK-CSSC-NEXT:    ret
 ;
 ; CHECK-GLOBAL-LABEL: smaxi32_undef:
 ; CHECK-GLOBAL:       // %bb.0:
@@ -306,14 +272,8 @@ define i32 @smaxi32_undef(i32 %a) {
 define i32 @smini32_undef(i32 %a) {
 ; CHECK-ISEL-LABEL: smini32_undef:
 ; CHECK-ISEL:       // %bb.0:
-; CHECK-ISEL-NEXT:    cmp w0, w8
-; CHECK-ISEL-NEXT:    csel w0, w0, w8, lt
+; CHECK-ISEL-NEXT:    mov w0, #-2147483648 // =0x80000000
 ; CHECK-ISEL-NEXT:    ret
-;
-; CHECK-CSSC-LABEL: smini32_undef:
-; CHECK-CSSC:       // %bb.0:
-; CHECK-CSSC-NEXT:    smin w0, w0, w8
-; CHECK-CSSC-NEXT:    ret
 ;
 ; CHECK-GLOBAL-LABEL: smini32_undef:
 ; CHECK-GLOBAL:       // %bb.0:
@@ -327,14 +287,8 @@ define i32 @smini32_undef(i32 %a) {
 define i32 @umaxi32_undef(i32 %a) {
 ; CHECK-ISEL-LABEL: umaxi32_undef:
 ; CHECK-ISEL:       // %bb.0:
-; CHECK-ISEL-NEXT:    cmp w0, w8
-; CHECK-ISEL-NEXT:    csel w0, w0, w8, hi
+; CHECK-ISEL-NEXT:    mov w0, #-1 // =0xffffffff
 ; CHECK-ISEL-NEXT:    ret
-;
-; CHECK-CSSC-LABEL: umaxi32_undef:
-; CHECK-CSSC:       // %bb.0:
-; CHECK-CSSC-NEXT:    umax w0, w0, w8
-; CHECK-CSSC-NEXT:    ret
 ;
 ; CHECK-GLOBAL-LABEL: umaxi32_undef:
 ; CHECK-GLOBAL:       // %bb.0:
@@ -348,14 +302,8 @@ define i32 @umaxi32_undef(i32 %a) {
 define i32 @umini32_undef(i32 %a) {
 ; CHECK-ISEL-LABEL: umini32_undef:
 ; CHECK-ISEL:       // %bb.0:
-; CHECK-ISEL-NEXT:    cmp w0, w8
-; CHECK-ISEL-NEXT:    csel w0, w0, w8, lo
+; CHECK-ISEL-NEXT:    mov w0, wzr
 ; CHECK-ISEL-NEXT:    ret
-;
-; CHECK-CSSC-LABEL: umini32_undef:
-; CHECK-CSSC:       // %bb.0:
-; CHECK-CSSC-NEXT:    umin w0, w0, w8
-; CHECK-CSSC-NEXT:    ret
 ;
 ; CHECK-GLOBAL-LABEL: umini32_undef:
 ; CHECK-GLOBAL:       // %bb.0:
