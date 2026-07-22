@@ -114,7 +114,7 @@ define <vscale x 4 x i32> @dont_propagate_poison(<vscale x 4 x i1> %pg, <vscale 
   ret <vscale x 4 x i32> %r
 }
 
-; The follow tests demonstrate the operations for which hooks are in place to
+; The following tests demonstrate the operations for which hooks are in place to
 ; enable simplification. Given the simplications themselves are common code, it
 ; is assumed they are already well tested elsewhere.
 
